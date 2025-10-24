@@ -1,0 +1,82 @@
+{
+  "connection": {
+    "host": "localhost",
+    "port": 8123,
+    "username": "default",
+    "password": "ch_pass",
+    "database": "default",
+    "secure": false
+  },
+  "target": {
+    "database": "default",
+    "table": "synthetic_events",
+    "order_by": "(ts_desc, id)",
+    "partition_by": null
+  },
+  "fields": [
+    {
+      "name": "ts_desc",
+      "type": "DateTime64(3)",
+      "generator": {
+        "kind": "timestamp_desc",
+        "params": { "start": "now", "step": "1s" }
+      }
+    },
+    {
+      "name": "ts_asc",
+      "type": "DateTime64(3)",
+      "generator": {
+        "kind": "timestamp_asc",
+        "params": { "start": "2025-01-01T00:00:00", "step": "1s" }
+      }
+    },
+    {
+      "name": "id",
+      "type": "UUID",
+      "generator": {
+        "kind": "uuid4",
+        "params": {}
+      }
+    },
+    {
+      "name": "digits",
+      "type": "String",
+      "generator": {
+        "kind": "random_digits",
+        "params": { "length": 12 }
+      }
+    },
+    {
+      "name": "url",
+      "type": "String",
+      "generator": {
+        "kind": "url_template",
+        "params": { "pattern": "https://example.com/item/{row}?uuid={uuid}" }
+      }
+    },
+    {
+      "name": "category",
+      "type": "LowCardinality(String)",
+      "generator": {
+        "kind": "enum_choice",
+        "params": { "values": ["news", "sports", "movies", "kids", "documentary"] }
+      }
+    },
+    {
+      "name": "value_int",
+      "type": "Int32",
+      "generator": {
+        "kind": "random_int",
+        "params": { "min": 0, "max": 100000 }
+      }
+    },
+    {
+      "name": "value_float",
+      "type": "Float64",
+      "generator": {
+        "kind": "random_float",
+        "params": { "min": 0.0, "max": 1000.0, "precision": 3 }
+      }
+    }
+  ]
+}
