@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Generator (OLD)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Field Generator <span class="badge-old">OLD</span></h1>
+            <p class="subtitle">Одна колонка — старая версия</p>
+        </header>
+
+        <div class="main-content">
+            <div class="config-panel">
+                <div class="panel-section panel-left">
+                    <h2>Поле таблицы</h2>
+                    <p id="apiStatus" class="api-status">Загрузка...</p>
+                    <div class="form-group">
+                        <label for="fieldName" class="field-label">Название поля</label>
+                        <input type="text" id="fieldName" placeholder="value" value="value">
+                    </div>
+                    <div class="form-group">
+                        <label for="fieldType" class="field-label">Тип данных</label>
+                        <select id="fieldType">
+                            <option value="String">Строка</option>
+                            <option value="Int32">Число</option>
+                            <option value="DateTime">Дата</option>
+                            <option value="UUID">UUID</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                        <label style="font-weight: 600; margin-bottom: 12px;">Подключение к БД</label>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="dbEngine" value="clickhouse" checked>
+                                    <span>ClickHouse</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="dbEngine" value="postgres">
+                                    <span>PostgreSQL</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="dbHost" class="field-label">Хост</label>
+                                <input type="text" id="dbHost" placeholder="localhost" value="localhost">
+                            </div>
+                            <div class="form-col">
+                                <label for="dbPort" class="field-label">Порт</label>
+                                <input type="number" id="dbPort" placeholder="18123" value="18123">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="dbUser" class="field-label">Пользователь</label>
+                                <input type="text" id="dbUser" placeholder="default" value="default">
+                            </div>
+                            <div class="form-col">
+                                <label for="dbPassword" class="field-label">Пароль</label>
+                                <input type="password" id="dbPassword" placeholder="ch_pass" value="ch_pass">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 12px;">
+                            <label for="dbDatabase" class="field-label">База данных</label>
+                            <input type="text" id="dbDatabase" placeholder="default" value="default" style="width: 100%;">
+                        </div>
+                        <div class="form-group" style="margin-top: 12px;">
+                            <label for="targetTable" class="field-label">Название таблицы</label>
+                            <input type="text" id="targetTable" placeholder="preview_table" value="preview_table" style="width: 100%;">
+                        </div>
+                        <label class="checkbox-label" style="margin-top: 12px;">
+                            <input type="checkbox" id="createTable" checked>
+                            <span>Создать таблицу автоматически</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel-section panel-right">
+                    <h2>Режим генерации</h2>
+                    <div class="form-group">
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="fieldMode" value="random" checked>
+                                <span>Случайное значение</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="fieldMode" value="sequential">
+                                <span>Последовательный перебор</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="fieldMode" value="fixed">
+                                <span>Фиксированный список значений</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="fieldGenerator" class="field-label">Генератор</label>
+                        <select id="fieldGenerator">
+                            <option value="">Выберите генератор</option>
+                        </select>
+                    </div>
+                    <div id="fieldParamsPanel" class="field-params-panel">
+                        <h3 style="font-size: 14px; margin: 0 0 12px;">Параметры генератора</h3>
+                        <div id="fieldParamsContent"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                        <label for="rowsToGenerate">Количество строк для генерации</label>
+                        <input type="number" id="rowsToGenerate" placeholder="Количество строк" value="10" min="1" max="1000000">
+                    </div>
+                    <button id="generatePreview" class="btn-generate">
+                        <span>🔄</span>
+                        Сгенерировать в БД и показать предпросмотр
+                    </button>
+                </div>
+            </div>
+
+            <div class="preview-section">
+                <div class="preview-header">
+                    <h2>Предпросмотр генерации</h2>
+                </div>
+                <div id="previewTable" class="preview-table">
+                    <div class="preview-placeholder">
+                        Нажмите кнопку "Сгенерировать в БД", чтобы сгенерировать данные и увидеть первые строки из таблицы
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>

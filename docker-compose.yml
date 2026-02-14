@@ -1,11 +1,10 @@
-version: "3.8"
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: clickhouse
     ports:
-      - "8123:8123"  # HTTP
-      - "9000:9000"  # Native TCP
+      - "18123:8123"  # HTTP (18123 на хосте -> 8123 в контейнере)
+      - "19000:9000"  # Native TCP (19000 на хосте -> 9000 в контейнере)
     environment:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=ch_pass

@@ -1,23 +1,18 @@
-# Генератор синтетических данных для ClickHouse
+# Field Generator — генератор синтетических данных
 
-Python инструмент для генерации синтетических тестовых данных и загрузки в ClickHouse или экспорта в CSV. Идеально подходит для наполнения витрин данных и нагрузочного тестирования.
+Инструмент для генерации синтетических тестовых данных и загрузки в **ClickHouse** или **PostgreSQL**. Веб-интерфейс и CLI.
 
 ## Возможности
-- Загрузка данных в ClickHouse по профилю подключения (host/port/user/password/database)
-- Автосоздание таблиц с описанием схемы (`--create-table`)
-- Стратегии генерации полей:
-  - `timestamp_asc` / `timestamp_desc` — возрастающие/убывающие временные метки
-  - `sequence_int` — целочисленная последовательность
-  - `random_int`, `random_float` — случайные числа
-  - `enum_choice` — выбор из предопределенных значений
-  - `random_digits` — строка случайных цифр указанной длины
-  - `uuid4` — случайный UUID v4
-  - `url_template` — URL с плейсхолдерами `{row}` и `{uuid}`
-- Вставка батчами с прогресс-баром
-- Альтернатива: экспорт в CSV
+- **ClickHouse** и **PostgreSQL** — выбор СУБД
+- Многополевой режим — таблица с несколькими колонками
+- Автосоздание таблиц по схеме
+- Генераторы: `random_int`, `sequence_int`, `timestamp_asc/desc`, `random_digits`, `uuid4`, `url_template`, `enum_choice`
+- Опция вещественных чисел для `random_int` (use_float + precision)
+- Вставка батчами, экспорт в CSV (CLI)
 
 ## Установка
-1) Установите Python 3.10+ (Windows: `py --version`)
+
+1) Python 3.10+ (Windows: `py --version`)
 
 2) В корне проекта:
 ```bash
@@ -26,47 +21,75 @@ py -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Быстрый старт
-1) Отредактируйте профиль: `profiles/sample_profile.json`
+## Структура проекта
 
-2) Сгенерировать 10 000 строк в ClickHouse с автосозданием таблицы:
-```bash
-python -m ch_synth.cli --profile profiles/sample_profile.json --rows 10000 --batch-size 5000 --create-table
+```
+Generator/
+├── ch_synth/           # Модули генерации (generators, profile, client, cli)
+├── backend/            # FastAPI сервер (трёхслойная архитектура)
+│   ├── server.py       # Точка входа
+│   └── layers/
+│       ├── presentation/   # API, модели
+│       ├── business/       # Логика генерации
+│       └── data/           # ClickHouse, PostgreSQL репозитории
+├── frontend/           # Веб-интерфейс (многополевой режим)
+├── OLD/                # Старая версия (одно поле, порт 5051)
+│   ├── backend/
+│   ├── frontend/
+│   └── ch_synth/       # Копия ch_synth для стабильной работы OLD
+└── profiles/           # Примеры профилей (если есть)
 ```
 
-3) Экспорт в CSV вместо БД:
+## Быстрый старт
+
+### Вариант 1: CLI (командная строка)
+
 ```bash
+# В ClickHouse
+python -m ch_synth.cli --profile profiles/sample_profile.json --rows 10000 --batch-size 5000 --create-table
+
+# В CSV
 python -m ch_synth.cli --profile profiles/sample_profile.json --rows 10000 --output-csv out.csv
 ```
 
-## Формат JSON профиля
-См. `profiles/sample_profile.json`. Кратко:
-- `connection` — параметры подключения к ClickHouse
-- `target` — база/таблица/опции (ORDER BY, PARTITION BY)
-- `fields[]` — список колонок с типами ClickHouse и генераторами
+### Вариант 2: Веб-интерфейс (новая версия)
 
-Ключевые поля:
-- `generator.kind`: одна из стратегий выше
-- `generator.params`: параметры стратегии (например, `start`, `step`, `min`, `max`, `values`, `length`, `pattern`)
-
-Подсказки:
-- Для `timestamp_*` используйте `start`: `"now"` или ISO-строку (`"2025-10-13T12:00:00"`), `step`: `"1s"`, `"5m"`, `"200ms"` и т.п.
-- Для `url_template` используйте `pattern`, например: `"https://ex.com/item/{row}?id={uuid}"`
-
-## Примеры
-- Поле по убыванию времени: `timestamp_desc` со `start: "now"` и `step: "1s"`
-- Поле по возрастанию: `timestamp_asc` со `start: "2025-01-01T00:00:00"`, `step: "1m"`
-- Набор цифр: `random_digits` с `length: 10`
-- Ссылки: либо `enum_choice` со списком URL, либо `url_template`
-
-## Настройка Docker
+1) Запустите сервер:
 ```bash
-# Запустить ClickHouse
-docker compose up -d
-
-# Проверить логи
-docker compose logs -f clickhouse
+uvicorn backend.server:app --reload --port 5000
 ```
+
+2) Откройте: **http://localhost:5000**
+
+3) Добавьте поля в таблицу, выберите генераторы, настройте подключение к БД и сгенерируйте данные
+
+### Вариант 3: Старая версия (одно поле)
+
+```bash
+python run_old.py
+```
+
+Откройте: **http://localhost:5051**
+
+## Формат JSON профиля (CLI)
+
+См. `profiles/sample_profile.json`:
+- `connection` — host, port, username, password, database
+- `target` — database, table, order_by, partition_by
+- `fields[]` — колонки с типами и генераторами (`kind`, `params`)
+
+## Docker (ClickHouse)
+
+```bash
+docker compose up -d
+# ClickHouse: localhost:18123, user=default, password=ch_pass
+```
+
+## Документация
+
+- **API (Swagger)**: http://localhost:5000/docs
+- **Backend**: `backend/README.md`, `backend/ARCHITECTURE.md`
+- **Frontend**: `frontend/README.md`
 
 ## Лицензия
 MIT

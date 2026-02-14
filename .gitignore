@@ -45,10 +45,19 @@ out/
 clickhouse_data/
 clickhouse_logs/
 
-# Docker volumes (if using bind mounts)
-data/
-logs/
+# Docker volumes (if using bind mounts) - только в корне проекта
+/data/
+/logs/
 
 # Temporary files
 *.tmp
 *.temp
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local development / Docker bind mounts
+postgres_data/

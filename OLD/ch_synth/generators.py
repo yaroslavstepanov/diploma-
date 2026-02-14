@@ -84,12 +84,9 @@ class SequenceIntGenerator(BaseGenerator):
     def next(self, row_index: int) -> int:
         value = self.start + self.step * row_index
         if self.probability is not None:
-            # С вероятностью probability возвращаем последовательное значение, иначе случайное
             if random.random() < self.probability:
                 return value
             else:
-                # Возвращаем случайное значение в разумном диапазоне
-                # Используем диапазон от start до текущего значения + некоторый запас
                 max_value = max(self.start, value + abs(self.step) * 10)
                 return random.randint(self.start, max_value)
         return value
@@ -100,8 +97,8 @@ class RandomIntGenerator(BaseGenerator):
     """Равномерно случайное целое число в [min, max]. При use_float — вещественные с заданной точностью."""
     min: int
     max: int
-    use_float: bool = False  # Генерировать вещественные числа вместо целых
-    precision: int = 2  # Количество знаков после запятой (при use_float)
+    use_float: bool = False
+    precision: int = 2
 
     def next(self, row_index: int) -> int | float:
         if self.use_float:
@@ -112,7 +109,6 @@ class RandomIntGenerator(BaseGenerator):
 
 @dataclass
 class RandomFloatGenerator(BaseGenerator):
-    """Равномерно случайное число с плавающей точкой в [min, max] округленное до precision знаков."""
     min: float
     max: float
     precision: int = 3
@@ -124,7 +120,6 @@ class RandomFloatGenerator(BaseGenerator):
 
 @dataclass
 class PercentageGenerator(BaseGenerator):
-    """Генератор процентов с точностью до 2 знаков после запятой (0.00-100.00)."""
     min: float = 0.0
     max: float = 100.0
     precision: int = 2
@@ -136,20 +131,17 @@ class PercentageGenerator(BaseGenerator):
 
 @dataclass
 class EnumChoiceGenerator(BaseGenerator):
-    """Выбирать случайное значение из фиксированного списка каждый раз."""
     values: List[Any]
-    weights: Optional[List[float]] = None  # Вероятности для каждого значения
+    weights: Optional[List[float]] = None
 
     def next(self, row_index: int) -> Any:
         if self.weights:
-            # Взвешенный выбор с вероятностями
             return random.choices(self.values, weights=self.weights, k=1)[0]
         return random.choice(self.values)
 
 
 @dataclass
 class RandomDigitsGenerator(BaseGenerator):
-    """Генерировать строку случайных десятичных цифр фиксированной длины."""
     length: int
 
     def next(self, row_index: int) -> str:
@@ -157,14 +149,12 @@ class RandomDigitsGenerator(BaseGenerator):
 
 
 class UUID4Generator(BaseGenerator):
-    """Генерировать RFC 4122 UUID v4 как строку для каждой строки."""
     def next(self, row_index: int) -> str:
         return str(uuid.uuid4())
 
 
 @dataclass
 class URLTemplateGenerator(BaseGenerator):
-    """Подставлять плейсхолдеры {row} и {uuid} в заданный шаблон."""
     pattern: str
 
     def next(self, row_index: int) -> str:
@@ -174,7 +164,6 @@ class URLTemplateGenerator(BaseGenerator):
 # Фабрика
 
 def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
-    """Фабрика: создать экземпляр генератора по типу и карте параметров."""
     kind_lower = kind.lower()
     if kind_lower == "timestamp_asc":
         start = parse_start_ts(params.get("start"))
@@ -187,7 +176,7 @@ def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
     if kind_lower == "sequence_int":
         probability = params.get("probability")
         if probability is not None:
-            probability = round(float(probability), 2)  # Точность 2 знака
+            probability = round(float(probability), 2)
             if probability < 0 or probability > 1:
                 raise ValueError("probability must be between 0 and 1")
         return SequenceIntGenerator(
@@ -216,15 +205,14 @@ def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
         values = params.get("values")
         if not isinstance(values, list) or not values:
             raise ValueError("enum_choice requires non-empty 'values' list")
-        weights = params.get("weights")  # Список вероятностей
+        weights = params.get("weights")
         if weights:
             if len(weights) != len(values):
                 raise ValueError("weights must have the same length as values")
-            # Нормализуем вероятности (сумма должна быть 100 или 1.0)
             weights_sum = sum(weights)
-            if weights_sum > 1.5:  # Если сумма больше 1.5, считаем что это проценты (0-100)
+            if weights_sum > 1.5:
                 weights = [w / 100.0 for w in weights]
-            normalized_weights = [w / sum(weights) for w in weights]  # Нормализуем до суммы 1.0
+            normalized_weights = [w / sum(weights) for w in weights]
             return EnumChoiceGenerator(values=list(values), weights=normalized_weights)
         return EnumChoiceGenerator(values=list(values))
     if kind_lower == "random_digits":
