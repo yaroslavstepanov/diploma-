@@ -171,11 +171,42 @@ class URLTemplateGenerator(BaseGenerator):
         return self.pattern.replace("{row}", str(row_index)).replace("{uuid}", str(uuid.uuid4()))
 
 
+# Пресеты regex для типовых форматов
+REGEX_PRESETS: Dict[str, str] = {
+    "ru_passport": r"[0-9]{4} [0-9]{6}",           # 1234 567890
+    "ru_phone": r"\+7 \([0-9]{3}\) [0-9]{3}-[0-9]{2}-[0-9]{2}",  # +7 (999) 123-45-67
+    "mac_address": r"[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}",       # AA:BB:CC:DD:EE:FF
+}
+
+
+@dataclass
+class RegexGenerator(BaseGenerator):
+    """Генерировать случайную строку, соответствующую регулярному выражению."""
+    pattern: str
+
+    def next(self, row_index: int) -> str:
+        import exrex
+        try:
+            return exrex.getone(self.pattern)
+        except Exception:
+            return f"[regex error: {self.pattern[:50]}...]" if len(self.pattern) > 50 else f"[regex error: {self.pattern}]"
+
+
 # Фабрика
 
 def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
     """Фабрика: создать экземпляр генератора по типу и карте параметров."""
-    kind_lower = kind.lower()
+    kind_lower = (kind or "").strip().lower()
+    # regex — раньше в цепочке, чтобы избежать проблем с кэшем
+    if kind_lower in ("regex", "regex_gen"):
+        preset = (params.get("preset") or "").strip()
+        if preset and preset in REGEX_PRESETS:
+            pattern = REGEX_PRESETS[preset]
+        else:
+            pattern = params.get("pattern")
+        if not pattern or not str(pattern).strip():
+            raise ValueError("regex generator requires 'preset' or 'pattern'")
+        return RegexGenerator(pattern=str(pattern).strip())
     if kind_lower == "timestamp_asc":
         start = parse_start_ts(params.get("start"))
         step = parse_duration(params.get("step", "1s"))

@@ -361,12 +361,46 @@ select:focus {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .preview-header h2 {
     font-size: 18px;
     font-weight: 600;
     color: #2c3e50;
+}
+
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.preview-control-label {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+}
+
+.preview-controls select {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.btn-refresh-preview {
+    padding: 6px 12px;
+    border: 1px solid #3498db;
+    background: white;
+    color: #3498db;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.btn-refresh-preview:hover {
+    background: #f0f8ff;
 }
 
 .preview-table {
@@ -378,6 +412,12 @@ select:focus {
     padding: 60px 20px;
     color: #999;
     font-size: 14px;
+}
+
+.preview-total {
+    margin-top: 12px;
+    color: #666;
+    font-size: 13px;
 }
 
 table {
@@ -564,6 +604,70 @@ table tr:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+
+.table-select-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.table-select-row select {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-load-tables {
+    padding: 8px 16px;
+    border: 1px solid #3498db;
+    background: white;
+    color: #3498db;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-load-tables:hover {
+    background: #f0f8ff;
+}
+
+.btn-load-tables:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.table-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-table-action {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #555;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-table-action:hover {
+    background: #f5f5f5;
+    border-color: #ccc;
+}
+
+.btn-table-action-danger {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.btn-table-action-danger:hover {
+    background: #fee;
+    border-color: #e74c3c;
 }
 
 .form-col {

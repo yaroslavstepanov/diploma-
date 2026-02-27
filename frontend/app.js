@@ -8,7 +8,7 @@ let REFERENCE_READY = false;
 
 // Fallback при недоступности API
 const FALLBACK_DATA_TYPE_GENERATORS = {
-    'String': { random: ['random_digits', 'uuid4', 'url_template', 'enum_choice'], sequential: [], fixed: ['enum_choice'] },
+    'String': { random: ['random_digits', 'uuid4', 'url_template', 'enum_choice', 'regex'], sequential: [], fixed: ['enum_choice'] },
     'Int32': { random: ['random_int'], sequential: ['sequence_int'], fixed: ['enum_choice'] },
     'DateTime': { random: ['timestamp_asc', 'timestamp_desc'], sequential: ['timestamp_asc', 'timestamp_desc'], fixed: ['enum_choice'] },
     'UUID': { random: ['uuid4'], sequential: [], fixed: [] }
@@ -22,13 +22,17 @@ const FALLBACK_GENERATOR_PARAMS = {
     'random_digits': { length: { type: 'number', label: 'Длина', default: 8, min: 1, max: 100 } },
     'uuid4': {},
     'url_template': { pattern: { type: 'text', label: 'Шаблон', placeholder: 'https://example.com/item/{row}?uuid={uuid}', default: 'https://example.com/item/{row}?uuid={uuid}' } },
-    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)', placeholder: '50\n30\n20' } }
+    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)', placeholder: '50\n30\n20' } },
+    'regex': {
+        preset: { type: 'select', label: 'Формат', default: '', options: ['', 'ru_passport', 'ru_phone', 'mac_address'], optionLabels: { '': 'Свой regex', 'ru_passport': 'Паспорт РФ', 'ru_phone': 'Телефон РФ (+7)', 'mac_address': 'MAC-адрес' } },
+        pattern: { type: 'text', label: 'Регулярное выражение', placeholder: '[A-Z]{3}-\\d{4}', default: '[a-z0-9]{8}' }
+    }
 };
 
 const FALLBACK_GENERATOR_LABELS = {
     'random_int': 'Случайные числа', 'sequence_int': 'Последовательность', 'timestamp_asc': 'Даты по возрастанию',
     'timestamp_desc': 'Даты по убыванию', 'random_digits': 'Случайные цифры', 'uuid4': 'UUID',
-    'url_template': 'URL шаблон', 'enum_choice': 'Список значений'
+    'url_template': 'URL шаблон', 'enum_choice': 'Список значений', 'regex': 'По regex'
 };
 const FALLBACK_ALL_GENERATORS = [
     { kind: 'uuid4', label: 'UUID', defaultType: 'UUID' },
@@ -36,6 +40,7 @@ const FALLBACK_ALL_GENERATORS = [
     { kind: 'sequence_int', label: 'Последовательность', defaultType: 'Int32' },
     { kind: 'random_digits', label: 'Случайные цифры', defaultType: 'String' },
     { kind: 'url_template', label: 'URL шаблон', defaultType: 'String' },
+    { kind: 'regex', label: 'По regex', defaultType: 'String' },
     { kind: 'timestamp_asc', label: 'Даты по возрастанию', defaultType: 'DateTime' },
     { kind: 'timestamp_desc', label: 'Даты по убыванию', defaultType: 'DateTime' },
     { kind: 'enum_choice', label: 'Список значений', defaultType: 'String' }
@@ -91,6 +96,7 @@ function buildFromApi(generators, types) {
             if (p.min != null) cfg.min = p.min;
             if (p.max != null) cfg.max = p.max;
             if (p.options) cfg.options = p.options;
+            if (p.option_labels) cfg.optionLabels = p.option_labels;
             if (p.name === 'probability') {
                 cfg.label = 'Вероятность последовательного значения (%)';
                 cfg.default = p.default != null ? p.default * 100 : 100;
@@ -164,6 +170,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnAddField').addEventListener('click', addField);
     document.getElementById('generatePreview').addEventListener('click', generatePreview);
     document.getElementById('btnSave').addEventListener('click', saveAsTemplate);
+    document.getElementById('btnLoadTables').addEventListener('click', loadTables);
+    document.getElementById('btnClearTable').addEventListener('click', clearTable);
+    document.getElementById('btnDropTable').addEventListener('click', dropTable);
+    document.getElementById('btnRefreshPreview').addEventListener('click', refreshPreview);
+
+    document.getElementById('tableSelect').addEventListener('change', () => {
+        const sel = document.getElementById('tableSelect');
+        const wrap = document.getElementById('targetTableWrap');
+        const actions = document.getElementById('tableActions');
+        wrap.style.display = sel.value === '__new__' ? '' : 'none';
+        actions.style.display = sel.value !== '__new__' ? '' : 'none';
+        if (sel.value !== '__new__') loadTablePreview(sel.value);
+    });
 
     document.querySelectorAll('input[name="dbEngine"]').forEach(radio => {
         radio.addEventListener('change', () => {
@@ -179,6 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 user.value = 'default';
                 pass.value = 'ch_pass';
             }
+            resetTableSelectForEngine();
         });
     });
 });
@@ -313,6 +333,7 @@ function updateFieldParamsPanel() {
         const paramGroup = document.createElement('div');
         paramGroup.className = 'param-group';
         if (f.generatorKind === 'random_int' && key === 'precision') paramGroup.dataset.showWhen = 'use_float';
+        if (f.generatorKind === 'regex' && key === 'pattern') paramGroup.dataset.showWhen = 'preset_empty';
         const label = document.createElement('label');
         label.textContent = config.label || key;
         let input;
@@ -323,10 +344,12 @@ function updateFieldParamsPanel() {
             input.value = Array.isArray(val) ? val.join('\n') : (val ?? config.default ?? '');
         } else if (config.type === 'select' && config.options) {
             input = document.createElement('select');
+            const labels = config.optionLabels || {};
             config.options.forEach(opt => {
                 const o = document.createElement('option');
-                o.value = o.textContent = opt;
-                if (opt === (f.params[key] ?? config.default)) o.selected = true;
+                o.value = opt;
+                o.textContent = (labels[opt] != null ? labels[opt] : opt) || '(пусто)';
+                if (String(opt) === String(f.params[key] ?? config.default ?? '')) o.selected = true;
                 input.appendChild(o);
             });
         } else if (config.type === 'checkbox') {
@@ -353,6 +376,10 @@ function updateFieldParamsPanel() {
                 const prec = content.querySelector('[data-show-when="use_float"]');
                 if (prec) prec.style.display = input.checked ? '' : 'none';
             }
+            if (f.generatorKind === 'regex' && key === 'preset') {
+                const pat = content.querySelector('[data-show-when="preset_empty"]');
+                if (pat) pat.style.display = (input.value === '' || input.value === undefined) ? '' : 'none';
+            }
         });
         paramGroup.appendChild(label);
         paramGroup.appendChild(input);
@@ -360,6 +387,11 @@ function updateFieldParamsPanel() {
         if (paramGroup.dataset.showWhen === 'use_float') {
             const useFloat = content.querySelector(`[data-param-key="use_float"]`);
             paramGroup.style.display = (useFloat && useFloat.checked) ? '' : 'none';
+        }
+        if (paramGroup.dataset.showWhen === 'preset_empty') {
+            const presetSel = content.querySelector(`[data-param-key="preset"]`);
+            const presetVal = presetSel ? presetSel.value : (f.params.preset ?? '');
+            paramGroup.style.display = (!presetVal || presetVal === '') ? '' : 'none';
         }
     });
 }
@@ -395,16 +427,9 @@ function getParamValue(input, type) {
     return input.value;
 }
 
-async function generatePreview() {
-    const fieldsData = collectFieldsForRequest();
-    if (!fieldsData.length) {
-        alert('Добавьте хотя бы одно поле с названием и выбранным генератором');
-        return;
-    }
-
-    const previewTable = document.getElementById('previewTable');
+function getConnection() {
     const engine = document.querySelector('input[name="dbEngine"]:checked')?.value || 'clickhouse';
-    const connection = {
+    return {
         engine,
         host: document.getElementById('dbHost').value || 'localhost',
         port: parseInt(document.getElementById('dbPort').value) || (engine === 'postgres' ? 5433 : 18123),
@@ -413,7 +438,190 @@ async function generatePreview() {
         database: document.getElementById('dbDatabase').value || 'default',
         secure: false
     };
-    const targetTable = document.getElementById('targetTable').value || 'preview_table';
+}
+
+function getTargetTable() {
+    const sel = document.getElementById('tableSelect');
+    return sel.value === '__new__' ? (document.getElementById('targetTable').value?.trim() || 'preview_table') : sel.value;
+}
+
+function resetTableSelectForEngine() {
+    const sel = document.getElementById('tableSelect');
+    const wrap = document.getElementById('targetTableWrap');
+    const infoEl = document.getElementById('tableListInfo');
+    const actions = document.getElementById('tableActions');
+    sel.innerHTML = '<option value="__new__">➕ Создать новую</option>';
+    sel.value = '__new__';
+    wrap.style.display = '';
+    infoEl.style.display = 'none';
+    actions.style.display = 'none';
+}
+
+async function clearTable() {
+    const table = getTargetTable();
+    if (table && document.getElementById('tableSelect').value === '__new__') return;
+    if (!table) {
+        alert('Выберите таблицу из списка');
+        return;
+    }
+    if (!confirm(`Очистить таблицу «${table}»? (TRUNCATE — удалятся все строки, схема сохранится)`)) return;
+    try {
+        const res = await fetch('/api/clear-table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connection: getConnection(), table })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Ошибка');
+        if (!data.success) throw new Error(data.message || 'Ошибка');
+        alert(data.message || 'Таблица очищена');
+    } catch (e) {
+        alert('Ошибка: ' + (e.message || e));
+    }
+}
+
+async function dropTable() {
+    const table = getTargetTable();
+    if (table && document.getElementById('tableSelect').value === '__new__') return;
+    if (!table) {
+        alert('Выберите таблицу из списка');
+        return;
+    }
+    if (!confirm(`Удалить таблицу «${table}»? (DROP TABLE — таблица будет удалена полностью. Это действие необратимо.)`)) return;
+    try {
+        const res = await fetch('/api/drop-table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connection: getConnection(), table })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Ошибка');
+        if (!data.success) throw new Error(data.message || 'Ошибка');
+        alert(data.message || 'Таблица удалена');
+        resetTableSelectForEngine();
+        loadTables();
+    } catch (e) {
+        alert('Ошибка: ' + (e.message || e));
+    }
+}
+
+async function loadTables() {
+    const btn = document.getElementById('btnLoadTables');
+    const sel = document.getElementById('tableSelect');
+    const connection = getConnection();
+    btn.disabled = true;
+    btn.textContent = 'Загрузка...';
+    try {
+        const res = await fetch('/api/list-tables', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connection })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail?.error || (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) || 'Ошибка загрузки');
+        if (!data.success) throw new Error(data.message || 'Ошибка загрузки');
+
+        const tables = data.tables || [];
+        const engine = data.engine || connection.engine || 'clickhouse';
+        const database = data.database || connection.database || 'default';
+        sel.innerHTML = '<option value="__new__">➕ Создать новую</option>';
+        tables.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        });
+        const infoEl = document.getElementById('tableListInfo');
+        const engineLabel = engine === 'postgres' ? 'PostgreSQL' : 'ClickHouse';
+        const count = tables.length;
+        const tablesWord = count === 1 ? 'таблица' : count >= 2 && count <= 4 ? 'таблицы' : 'таблиц';
+        infoEl.textContent = `${engineLabel}: ${database} (${count} ${tablesWord})`;
+        infoEl.style.display = '';
+        document.getElementById('tableActions').style.display = sel.value !== '__new__' ? '' : 'none';
+    } catch (e) {
+        alert('Ошибка загрузки таблиц: ' + (e.message || e));
+        document.getElementById('tableListInfo').style.display = 'none';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Загрузить';
+    }
+}
+
+function getPreviewLimit() {
+    return parseInt(document.getElementById('previewLimit').value) || 100;
+}
+
+function renderPreviewTable(fetchResult) {
+    let html = '<table><thead><tr>';
+    fetchResult.columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    fetchResult.data.forEach(row => {
+        html += '<tr>';
+        row.forEach(cell => {
+            html += `<td>${escapeHtml(String(cell))}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    if (fetchResult.total_rows !== null) {
+        html += `<div class="preview-total">Всего строк в таблице: ${fetchResult.total_rows}</div>`;
+    }
+    return html;
+}
+
+async function loadTablePreview(tableName, shuffle = false) {
+    const previewTable = document.getElementById('previewTable');
+    const connection = getConnection();
+    const limit = getPreviewLimit();
+    previewTable.innerHTML = '<div class="preview-placeholder">Загрузка данных...</div>';
+    try {
+        const res = await fetch('/api/fetch-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                connection,
+                table: tableName,
+                limit,
+                shuffle,
+                float_precision: 2
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Ошибка получения данных');
+        if (!data.success) throw new Error(data.message || 'Ошибка');
+        previewTable.innerHTML = renderPreviewTable(data);
+    } catch (e) {
+        previewTable.innerHTML = `<div class="preview-placeholder" style="color: #e74c3c;">Ошибка: ${escapeHtml(e.message || e)}</div>`;
+    }
+}
+
+async function refreshPreview() {
+    const sel = document.getElementById('tableSelect');
+    const table = sel.value === '__new__' ? null : sel.value;
+    if (!table) {
+        const manualTable = document.getElementById('targetTable').value?.trim();
+        if (manualTable) {
+            await loadTablePreview(manualTable, false);
+        } else {
+            alert('Выберите таблицу из списка или укажите имя для «Создать новую»');
+        }
+        return;
+    }
+    await loadTablePreview(table, false);
+}
+
+async function generatePreview() {
+    const fieldsData = collectFieldsForRequest();
+    if (!fieldsData.length) {
+        alert('Добавьте хотя бы одно поле с названием и выбранным генератором');
+        return;
+    }
+
+    const previewTable = document.getElementById('previewTable');
+    const connection = getConnection();
+    const targetTable = getTargetTable();
     const createTable = document.getElementById('createTable').checked;
     const rowsToGenerate = parseInt(document.getElementById('rowsToGenerate').value) || 10;
 
@@ -456,13 +664,14 @@ async function generatePreview() {
         previewTable.innerHTML = '<div class="preview-placeholder">Загрузка данных из БД...</div>';
         const hasFloat = fieldsData.some(f => f.generator_kind === 'random_int' && f.generator_params?.use_float);
         const precision = hasFloat ? 2 : 2;
+        const previewLimit = getPreviewLimit();
         const fetchResponse = await fetch('/api/fetch-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 connection,
                 table: targetTable,
-                limit: 10,
+                limit: previewLimit,
                 shuffle: true,
                 float_precision: precision
             })
@@ -476,23 +685,7 @@ async function generatePreview() {
             throw new Error('Ошибка получения данных из БД');
         }
 
-        let html = '<table><thead><tr>';
-        fetchResult.columns.forEach(col => {
-            html += `<th>${escapeHtml(col)}</th>`;
-        });
-        html += '</tr></thead><tbody>';
-        fetchResult.data.forEach(row => {
-            html += '<tr>';
-            row.forEach(cell => {
-                html += `<td>${escapeHtml(String(cell))}</td>`;
-            });
-            html += '</tr>';
-        });
-        html += '</tbody></table>';
-        if (fetchResult.total_rows !== null) {
-            html += `<div style="margin-top: 12px; color: #666; font-size: 13px;">Всего строк в таблице: ${fetchResult.total_rows}</div>`;
-        }
-        previewTable.innerHTML = html;
+        previewTable.innerHTML = renderPreviewTable(fetchResult);
     } catch (error) {
         previewTable.innerHTML = `<div class="preview-placeholder" style="color: #e74c3c;">Ошибка: ${escapeHtml(error.message)}</div>`;
     }
@@ -563,6 +756,17 @@ function convertParamsForBackend(generatorKind, params) {
         case 'uuid4':
         case 'url_template':
             return params;
+        case 'regex': {
+            const result = {};
+            if (params.preset && params.preset.trim()) {
+                result.preset = params.preset.trim();
+            } else if (params.pattern && params.pattern.trim()) {
+                result.pattern = params.pattern.trim();
+            } else {
+                result.pattern = params.pattern || '[a-z0-9]{8}';
+            }
+            return result;
+        }
         case 'enum_choice': {
             const result = { values: params.values || [] };
             if (params.weights && params.weights.length > 0) {

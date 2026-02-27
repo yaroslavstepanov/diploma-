@@ -452,7 +452,7 @@ class ListTablesHandler:
                 )
                 try:
                     tables = repository.list_tables()
-                    return ListTablesResponse(success=True, tables=tables, database=database)
+                    return ListTablesResponse(success=True, engine="postgres", database=database, tables=tables)
                 finally:
                     repository.close()
             else:
@@ -471,7 +471,7 @@ class ListTablesHandler:
                 repository = ClickHouseRepository(profile)
                 try:
                     tables = repository.list_tables(database)
-                    return ListTablesResponse(success=True, tables=tables, database=database)
+                    return ListTablesResponse(success=True, engine="clickhouse", database=database, tables=tables)
                 finally:
                     repository.close()
                     if profile_path and os.path.exists(profile_path):
@@ -554,6 +554,29 @@ GENERATORS_SPEC = [
         params=[
             GeneratorParamSchema(name="values", type="array", required=True, description="Список значений (по одному на строку)", placeholder="value1\nvalue2\nvalue3"),
             GeneratorParamSchema(name="weights", type="array", required=False, description="Вероятности % (опционально)", placeholder="50\n30\n20"),
+        ],
+    ),
+    GeneratorSchema(
+        kind="regex",
+        description="Случайная строка по регулярному выражению. Выберите пресет или введите свой regex.",
+        compatible_types=["String"],
+        params=[
+            GeneratorParamSchema(
+                name="preset",
+                type="select",
+                required=False,
+                description="Готовый формат или свой шаблон",
+                default="",
+                options=["", "ru_passport", "ru_phone", "mac_address"],
+                option_labels={"": "Свой regex", "ru_passport": "Паспорт РФ", "ru_phone": "Телефон РФ (+7)", "mac_address": "MAC-адрес"},
+            ),
+            GeneratorParamSchema(
+                name="pattern",
+                type="string",
+                required=False,
+                description="Свой regex (если пресет не выбран)",
+                placeholder=r"[A-Z]{3}-\d{4}",
+            ),
         ],
     ),
 ]

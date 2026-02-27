@@ -7,7 +7,7 @@ let SUPPORTED_TYPES = [];
 let fieldParamsState = {};
 
 const FALLBACK_DATA_TYPE_GENERATORS = {
-    'String': { random: ['random_digits', 'uuid4', 'url_template', 'enum_choice'], sequential: [], fixed: ['enum_choice'] },
+    'String': { random: ['random_digits', 'uuid4', 'url_template', 'enum_choice', 'regex'], sequential: [], fixed: ['enum_choice'] },
     'Int32': { random: ['random_int'], sequential: ['sequence_int'], fixed: ['enum_choice'] },
     'DateTime': { random: ['timestamp_asc', 'timestamp_desc'], sequential: ['timestamp_asc', 'timestamp_desc'], fixed: ['enum_choice'] },
     'UUID': { random: ['uuid4'], sequential: [], fixed: [] }
@@ -21,13 +21,17 @@ const FALLBACK_GENERATOR_PARAMS = {
     'random_digits': { length: { type: 'number', label: 'Длина', default: 8, min: 1, max: 100 } },
     'uuid4': {},
     'url_template': { pattern: { type: 'text', label: 'Шаблон', default: 'https://example.com/item/{row}?uuid={uuid}' } },
-    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)' } }
+    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)' } },
+    'regex': {
+        preset: { type: 'select', label: 'Формат', default: '', options: ['', 'ru_passport', 'ru_phone', 'mac_address'], optionLabels: { '': 'Свой regex', 'ru_passport': 'Паспорт РФ', 'ru_phone': 'Телефон РФ (+7)', 'mac_address': 'MAC-адрес' } },
+        pattern: { type: 'text', label: 'Регулярное выражение', placeholder: '[A-Z]{3}-\\d{4}', default: '[a-z0-9]{8}' }
+    }
 };
 
 const FALLBACK_GENERATOR_LABELS = {
     'random_int': 'Случайные числа', 'sequence_int': 'Последовательность', 'timestamp_asc': 'Даты по возрастанию',
     'timestamp_desc': 'Даты по убыванию', 'random_digits': 'Случайные цифры', 'uuid4': 'UUID',
-    'url_template': 'URL шаблон', 'enum_choice': 'Список значений'
+    'url_template': 'URL шаблон', 'enum_choice': 'Список значений', 'regex': 'По regex'
 };
 
 const SEQUENTIAL_KINDS = ['sequence_int', 'timestamp_asc', 'timestamp_desc'];
@@ -60,6 +64,8 @@ function buildFromApi(generators, types) {
             if (p.min != null) genParams[g.kind][p.name].min = p.min;
             if (p.max != null) genParams[g.kind][p.name].max = p.max;
             if (p.step != null) genParams[g.kind][p.name].step = p.step;
+            if (p.options) genParams[g.kind][p.name].options = p.options;
+            if (p.option_labels) genParams[g.kind][p.name].optionLabels = p.option_labels;
         }
     }
     return { dtypeGen, genParams, genLabels, allGens };
@@ -95,6 +101,7 @@ async function loadReferenceData() {
             { kind: 'sequence_int', label: 'Последовательность', defaultType: 'Int32' },
             { kind: 'random_digits', label: 'Случайные цифры', defaultType: 'String' },
             { kind: 'url_template', label: 'URL шаблон', defaultType: 'String' },
+            { kind: 'regex', label: 'По regex', defaultType: 'String' },
             { kind: 'timestamp_asc', label: 'Даты по возрастанию', defaultType: 'DateTime' },
             { kind: 'timestamp_desc', label: 'Даты по убыванию', defaultType: 'DateTime' },
             { kind: 'enum_choice', label: 'Список значений', defaultType: 'String' }
@@ -152,10 +159,21 @@ function updateFieldParamsPanel() {
         const div = document.createElement('div');
         div.className = 'param-group';
         if (kind === 'random_int' && key === 'precision') div.dataset.showWhen = 'use_float';
+        if (kind === 'regex' && key === 'pattern') div.dataset.showWhen = 'preset_empty';
         const label = document.createElement('label');
         label.textContent = config.label || key;
         let input;
-        if (config.type === 'textarea') {
+        if (config.type === 'select' && config.options) {
+            input = document.createElement('select');
+            const labels = config.optionLabels || {};
+            config.options.forEach(opt => {
+                const o = document.createElement('option');
+                o.value = opt;
+                o.textContent = (labels[opt] != null ? labels[opt] : opt) || '(пусто)';
+                if (String(opt) === String(state[key] ?? config.default ?? '')) o.selected = true;
+                input.appendChild(o);
+            });
+        } else if (config.type === 'textarea') {
             input = document.createElement('textarea');
             input.placeholder = config.placeholder || '';
             const val = state[key];
@@ -178,13 +196,17 @@ function updateFieldParamsPanel() {
         }
         input.dataset.paramKey = key;
         input.dataset.generatorKind = kind;
-        const ev = (config.type === 'checkbox') ? 'change' : 'input';
+        const ev = (config.type === 'checkbox' || config.type === 'select') ? 'change' : 'input';
         input.addEventListener(ev, () => {
             if (!fieldParamsState[kind]) fieldParamsState[kind] = {};
             fieldParamsState[kind][key] = getParamValue(input, config.type);
             if (kind === 'random_int' && key === 'use_float') {
                 const precDiv = content.querySelector('[data-show-when="use_float"]');
                 if (precDiv) precDiv.style.display = input.checked ? '' : 'none';
+            }
+            if (kind === 'regex' && key === 'preset') {
+                const patDiv = content.querySelector('[data-show-when="preset_empty"]');
+                if (patDiv) patDiv.style.display = (input.value === '' || input.value === undefined) ? '' : 'none';
             }
         });
         div.appendChild(label);
@@ -194,6 +216,11 @@ function updateFieldParamsPanel() {
             const useFloatInput = content.querySelector('[data-param-key="use_float"]');
             div.style.display = (useFloatInput && useFloatInput.checked) ? '' : 'none';
         }
+        if (div.dataset.showWhen === 'preset_empty') {
+            const presetSel = content.querySelector('[data-param-key="preset"]');
+            const presetVal = presetSel ? presetSel.value : (state.preset ?? '');
+            div.style.display = (!presetVal || presetVal === '') ? '' : 'none';
+        }
     });
 }
 
@@ -201,6 +228,7 @@ function getParamValue(input, type) {
     if (type === 'number') return parseFloat(input.value) || 0;
     if (type === 'textarea') return input.value.split('\n').filter(v => v.trim()).map(v => v.trim());
     if (type === 'checkbox') return input.checked;
+    if (type === 'select') return input.value;
     return input.value;
 }
 
@@ -217,6 +245,12 @@ function convertParamsForBackend(kind, params) {
     }
     if (kind === 'enum_choice' && params.weights && params.weights.length > 0) {
         backendParams.weights = params.weights.map(w => Math.round((parseFloat(w) || 0) * 100) / 100);
+    }
+    if (kind === 'regex') {
+        if (params.preset && params.preset.trim()) {
+            return { preset: params.preset.trim() };
+        }
+        return { pattern: (params.pattern && params.pattern.trim()) ? params.pattern.trim() : '[a-z0-9]{8}' };
     }
     return backendParams;
 }

@@ -4,9 +4,9 @@
 
 ## Возможности
 - **ClickHouse** и **PostgreSQL** — выбор СУБД
-- Многополевой режим — таблица с несколькими колонками
+- Многополевой режим — таблица с несколькими колонкамиnf
 - Автосоздание таблиц по схеме
-- Генераторы: `random_int`, `sequence_int`, `timestamp_asc/desc`, `random_digits`, `uuid4`, `url_template`, `enum_choice`
+- Генераторы: `random_int`, `sequence_int`, `timestamp_asc/desc`, `random_digits`, `uuid4`, `url_template`, `enum_choice`, `regex` (по regex или пресетам: паспорт РФ, телефон РФ, MAC-адрес)
 - Опция вещественных чисел для `random_int` (use_float + precision)
 - Вставка батчами, экспорт в CSV (CLI)
 
@@ -84,6 +84,13 @@ python run_old.py
 docker compose up -d
 # ClickHouse: localhost:18123, user=default, password=ch_pass
 ```
+
+## Тестирование
+
+1. Запустите сервер: `python -m uvicorn backend.server:app --reload --port 5000`
+2. В другом терминале: `python test_regex_api.py`
+
+Скрипт проверяет предпросмотр regex-генератора (шаблон `[A-Z]{3}-[0-9]{4}` → например `KXM-4960`, `ITQ-2367`) и наличие `regex` в списке генераторов.
 
 ## Документация
 

@@ -257,8 +257,9 @@ class ListTablesRequest(BaseModel):
 class ListTablesResponse(BaseModel):
     """Ответ со списком таблиц"""
     success: bool = Field(..., description="Успешность операции", example=True)
-    tables: List[str] = Field(..., description="Список имён таблиц", example=["preview_table", "my_table"])
+    engine: str = Field(..., description="СУБД: clickhouse | postgres", example="clickhouse")
     database: str = Field(..., description="Имя базы данных", example="default")
+    tables: List[str] = Field(..., description="Список имён таблиц", example=["preview_table", "my_table"])
 
 
 class FetchDataResponse(BaseModel):
@@ -282,6 +283,7 @@ class GeneratorParamSchema(BaseModel):
     min: Optional[float] = Field(None, description="Минимальное значение (для number)")
     max: Optional[float] = Field(None, description="Максимальное значение (для number)")
     options: Optional[List[str]] = Field(None, description="Варианты для select")
+    option_labels: Optional[Dict[str, str]] = Field(None, description="Подписи для options (value -> label)")
 
 
 class GeneratorSchema(BaseModel):

@@ -37,11 +37,6 @@
                     </div>
                     <button type="button" id="btnAddField" class="btn-add-field">+ Добавить поле</button>
 
-                    <div id="fieldParamsPanel" class="field-params-panel" style="display: none;">
-                        <h3 style="font-size: 14px; margin: 16px 0 12px;">Параметры выбранного поля</h3>
-                        <div id="fieldParamsContent"></div>
-                    </div>
-                    
                     <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
                         <label style="font-weight: 600; margin-bottom: 12px;">Подключение к БД</label>
                         <div class="form-group" style="margin-bottom: 12px;">
@@ -81,8 +76,22 @@
                             <input type="text" id="dbDatabase" placeholder="default" value="default" style="width: 100%;">
                         </div>
                         <div class="form-group" style="margin-top: 12px;">
-                            <label for="targetTable" class="field-label">Название таблицы</label>
-                            <input type="text" id="targetTable" placeholder="preview_table" value="preview_table" style="width: 100%;">
+                            <label for="tableSelect" class="field-label">Название таблицы</label>
+                            <div class="table-select-row">
+                                <select id="tableSelect">
+                                    <option value="__new__">➕ Создать новую</option>
+                                </select>
+                                <button type="button" id="btnLoadTables" class="btn-load-tables" title="Загрузить список таблиц из БД">Загрузить</button>
+                            </div>
+                            <p id="tableListInfo" class="table-list-info" style="display: none; font-size: 12px; color: #666; margin-top: 6px;"></p>
+                            <div id="tableActions" class="table-actions" style="display: none; margin-top: 8px;">
+                                <button type="button" id="btnClearTable" class="btn-table-action" title="TRUNCATE — удалить все строки, схема сохраняется">Очистить</button>
+                                <button type="button" id="btnDropTable" class="btn-table-action btn-table-action-danger" title="DROP TABLE — удалить таблицу полностью">Удалить</button>
+                            </div>
+                            <div id="targetTableWrap" class="form-group" style="margin-top: 8px;">
+                                <label for="targetTable" class="field-label" style="font-size: 12px;">Имя новой таблицы</label>
+                                <input type="text" id="targetTable" placeholder="preview_table" value="preview_table" style="width: 100%;">
+                            </div>
                         </div>
                         <label class="checkbox-label" style="margin-top: 12px;">
                             <input type="checkbox" id="createTable" checked>
@@ -92,7 +101,11 @@
                 </div>
 
                 <div class="panel-section">
-                    <div class="form-group" style="margin-top: 0;">
+                    <div id="fieldParamsPanel" class="field-params-panel" style="display: none;">
+                        <h3 style="font-size: 14px; margin: 0 0 12px;">Параметры выбранного поля</h3>
+                        <div id="fieldParamsContent"></div>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
                         <label for="rowsToGenerate">Количество строк для генерации</label>
                         <input type="number" id="rowsToGenerate" placeholder="Количество строк" value="10" min="1" max="1000000">
                     </div>
@@ -106,7 +119,18 @@
 
             <div class="preview-section">
                 <div class="preview-header">
-                    <h2>Предпросмотр генерации</h2>
+                    <h2>Предпросмотр</h2>
+                    <div class="preview-controls">
+                        <label for="previewLimit" class="preview-control-label">Строк:</label>
+                        <select id="previewLimit">
+                            <option value="10">10</option>
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                        </select>
+                        <button type="button" id="btnRefreshPreview" class="btn-refresh-preview" title="Обновить данные в предпросмотре">↻ Обновить</button>
+                    </div>
                 </div>
                 <div id="previewTable" class="preview-table">
                     <div class="preview-placeholder">
@@ -124,6 +148,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>

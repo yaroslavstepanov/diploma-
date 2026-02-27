@@ -84,6 +84,10 @@ GENERATORS = [
         {"name": "values", "type": "array", "description": "Значения (по строке)", "placeholder": "value1\nvalue2"},
         {"name": "weights", "type": "array", "description": "Вероятности % (опционально)"},
     ]},
+    {"kind": "regex", "description": "Случайная строка по regex. Выберите пресет или введите свой.", "compatible_types": ["String"], "params": [
+        {"name": "preset", "type": "select", "default": "", "description": "Готовый формат", "options": ["", "ru_passport", "ru_phone", "mac_address"], "option_labels": {"": "Свой regex", "ru_passport": "Паспорт РФ", "ru_phone": "Телефон РФ (+7)", "mac_address": "MAC-адрес"}},
+        {"name": "pattern", "type": "string", "default": "[a-z0-9]{8}", "description": "Регулярное выражение (если пресет не выбран)", "placeholder": "[A-Z]{3}-\\d{4}"},
+    ]},
 ]
 
 
