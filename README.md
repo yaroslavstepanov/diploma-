@@ -98,5 +98,4 @@ docker compose up -d
 - **Backend**: `backend/README.md`, `backend/ARCHITECTURE.md`
 - **Frontend**: `frontend/README.md`
 
-## Лицензия
-MIT
+
