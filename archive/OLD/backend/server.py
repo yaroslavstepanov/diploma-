@@ -80,9 +80,10 @@ GENERATORS = [
     {"kind": "url_template", "description": "URL шаблон", "compatible_types": ["String"], "params": [
         {"name": "pattern", "type": "string", "default": "https://example.com/item/{row}?uuid={uuid}", "placeholder": "https://example.com/item/{row}?uuid={uuid}"},
     ]},
-    {"kind": "enum_choice", "description": "Случайный выбор из списка", "compatible_types": ["String", "Int32", "DateTime", "UUID"], "params": [
+    {"kind": "enum_choice", "description": "Выбор из списка: случайно или по очереди", "compatible_types": ["String", "Int32", "DateTime", "UUID"], "params": [
+        {"name": "mode", "type": "select", "default": "random", "description": "Режим", "options": ["random", "sequential"], "option_labels": {"random": "Случайный", "sequential": "По очереди"}},
         {"name": "values", "type": "array", "description": "Значения (по строке)", "placeholder": "value1\nvalue2"},
-        {"name": "weights", "type": "array", "description": "Вероятности % (опционально)"},
+        {"name": "weights", "type": "array", "description": "Вероятности % (только для случайного)"},
     ]},
     {"kind": "regex", "description": "Случайная строка по regex. Выберите пресет или введите свой.", "compatible_types": ["String"], "params": [
         {"name": "preset", "type": "select", "default": "", "description": "Готовый формат", "options": ["", "ru_passport", "ru_phone", "mac_address"], "option_labels": {"": "Свой regex", "ru_passport": "Паспорт РФ", "ru_phone": "Телефон РФ (+7)", "mac_address": "MAC-адрес"}},

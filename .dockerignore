@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+*.md
+archive
+scripts
+tests
+docs
+clickhouse_data
+*.log
+.idea
+.vscode

@@ -136,13 +136,15 @@ class PercentageGenerator(BaseGenerator):
 
 @dataclass
 class EnumChoiceGenerator(BaseGenerator):
-    """Выбирать случайное значение из фиксированного списка каждый раз."""
+    """Выбирать значение из фиксированного списка: случайно или по очереди (round-robin)."""
     values: List[Any]
-    weights: Optional[List[float]] = None  # Вероятности для каждого значения
+    weights: Optional[List[float]] = None  # Вероятности (только для mode=random)
+    mode: str = "random"  # "random" | "sequential" — по очереди
 
     def next(self, row_index: int) -> Any:
+        if (self.mode or "random").lower() == "sequential":
+            return self.values[row_index % len(self.values)]
         if self.weights:
-            # Взвешенный выбор с вероятностями
             return random.choices(self.values, weights=self.weights, k=1)[0]
         return random.choice(self.values)
 
@@ -244,20 +246,22 @@ def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
             precision=int(params.get("precision", 2))
         )
     if kind_lower == "enum_choice":
+        # values могут быть подставлены из dictionary в create_generator
         values = params.get("values")
         if not isinstance(values, list) or not values:
-            raise ValueError("enum_choice requires non-empty 'values' list")
-        weights = params.get("weights")  # Список вероятностей
-        if weights:
-            if len(weights) != len(values):
-                raise ValueError("weights must have the same length as values")
-            # Нормализуем вероятности (сумма должна быть 100 или 1.0)
-            weights_sum = sum(weights)
-            if weights_sum > 1.5:  # Если сумма больше 1.5, считаем что это проценты (0-100)
-                weights = [w / 100.0 for w in weights]
-            normalized_weights = [w / sum(weights) for w in weights]  # Нормализуем до суммы 1.0
-            return EnumChoiceGenerator(values=list(values), weights=normalized_weights)
-        return EnumChoiceGenerator(values=list(values))
+            raise ValueError("enum_choice requires non-empty 'values' or 'dictionary'")
+        mode = (params.get("mode") or "random").strip().lower() or "random"
+        weights = None
+        if mode == "random":
+            weights = params.get("weights")
+            if weights:
+                if len(weights) != len(values):
+                    raise ValueError("weights must have the same length as values")
+                weights_sum = sum(weights)
+                if weights_sum > 1.5:
+                    weights = [w / 100.0 for w in weights]
+                weights = [w / sum(weights) for w in weights]
+        return EnumChoiceGenerator(values=list(values), weights=weights, mode=mode)
     if kind_lower == "random_digits":
         return RandomDigitsGenerator(length=int(params.get("length", 8)))
     if kind_lower == "uuid4":

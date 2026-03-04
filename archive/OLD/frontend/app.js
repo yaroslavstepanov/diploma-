@@ -21,7 +21,11 @@ const FALLBACK_GENERATOR_PARAMS = {
     'random_digits': { length: { type: 'number', label: 'Длина', default: 8, min: 1, max: 100 } },
     'uuid4': {},
     'url_template': { pattern: { type: 'text', label: 'Шаблон', default: 'https://example.com/item/{row}?uuid={uuid}' } },
-    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)' } },
+    'enum_choice': {
+        mode: { type: 'select', label: 'Режим', default: 'random', options: ['random', 'sequential'], optionLabels: { 'random': 'Случайный', 'sequential': 'По очереди' } },
+        values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' },
+        weights: { type: 'textarea', label: 'Вероятности % (опционально)' }
+    },
     'regex': {
         preset: { type: 'select', label: 'Формат', default: '', options: ['', 'ru_passport', 'ru_phone', 'mac_address'], optionLabels: { '': 'Свой regex', 'ru_passport': 'Паспорт РФ', 'ru_phone': 'Телефон РФ (+7)', 'mac_address': 'MAC-адрес' } },
         pattern: { type: 'text', label: 'Регулярное выражение', placeholder: '[A-Z]{3}-\\d{4}', default: '[a-z0-9]{8}' }
@@ -160,6 +164,7 @@ function updateFieldParamsPanel() {
         div.className = 'param-group';
         if (kind === 'random_int' && key === 'precision') div.dataset.showWhen = 'use_float';
         if (kind === 'regex' && key === 'pattern') div.dataset.showWhen = 'preset_empty';
+        if (kind === 'enum_choice' && key === 'weights') div.dataset.showWhen = 'enum_mode_random';
         const label = document.createElement('label');
         label.textContent = config.label || key;
         let input;
@@ -208,6 +213,10 @@ function updateFieldParamsPanel() {
                 const patDiv = content.querySelector('[data-show-when="preset_empty"]');
                 if (patDiv) patDiv.style.display = (input.value === '' || input.value === undefined) ? '' : 'none';
             }
+            if (kind === 'enum_choice' && key === 'mode') {
+                const w = content.querySelector('[data-show-when="enum_mode_random"]');
+                if (w) w.style.display = (input.value === 'random') ? '' : 'none';
+            }
         });
         div.appendChild(label);
         div.appendChild(input);
@@ -220,6 +229,11 @@ function updateFieldParamsPanel() {
             const presetSel = content.querySelector('[data-param-key="preset"]');
             const presetVal = presetSel ? presetSel.value : (state.preset ?? '');
             div.style.display = (!presetVal || presetVal === '') ? '' : 'none';
+        }
+        if (div.dataset.showWhen === 'enum_mode_random') {
+            const modeSel = content.querySelector('[data-param-key="mode"]');
+            const modeVal = modeSel ? modeSel.value : (state.mode ?? 'random');
+            div.style.display = (modeVal === 'random') ? '' : 'none';
         }
     });
 }
@@ -243,8 +257,11 @@ function convertParamsForBackend(kind, params) {
     if (kind === 'sequence_int' && params.probability !== undefined) {
         backendParams.probability = Math.round(params.probability * 100) / 10000;
     }
-    if (kind === 'enum_choice' && params.weights && params.weights.length > 0) {
-        backendParams.weights = params.weights.map(w => Math.round((parseFloat(w) || 0) * 100) / 100);
+    if (kind === 'enum_choice') {
+        backendParams.mode = params.mode || 'random';
+        if (backendParams.mode === 'random' && params.weights && params.weights.length > 0) {
+            backendParams.weights = params.weights.map(w => Math.round((parseFloat(w) || 0) * 100) / 100);
+        }
     }
     if (kind === 'regex') {
         if (params.preset && params.preset.trim()) {

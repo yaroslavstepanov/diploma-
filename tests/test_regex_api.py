@@ -3,7 +3,7 @@
 
 Запуск:
   1. Запустите сервер: python -m uvicorn backend.server:app --reload --port 5000
-  2. Выполните: python test_regex_api.py
+  2. Выполните: python tests/test_regex_api.py
 """
 import requests
 import json

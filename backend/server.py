@@ -22,7 +22,7 @@ from backend.layers.presentation.models import (
     ListTablesRequest, ListTablesResponse,
     GeneratorsResponse, SupportedTypesResponse,
     DescribeTableRequest, DescribeTableResponse,
-    HealthResponse
+    HealthResponse, DictionariesResponse
 )
 from backend.layers.presentation.routes import (
     GenerateHandler, FetchDataHandler, TestConnectionHandler, ClearTableHandler,
@@ -230,6 +230,19 @@ async def get_generators() -> GeneratorsResponse:
 )
 async def get_supported_types() -> SupportedTypesResponse:
     return await SupportedTypesHandler.handle()
+
+
+@app.get(
+    "/api/dictionaries",
+    response_model=DictionariesResponse,
+    summary="Список словарей",
+    description="Именованные словари из dictionaries/index.json для enum_choice.",
+    tags=["Справочники"]
+)
+async def get_dictionaries() -> DictionariesResponse:
+    from backend.dictionaries import list_dictionaries
+    items = list_dictionaries()
+    return DictionariesResponse(dictionaries=[{"name": x["name"], "values_count": x["values_count"]} for x in items])
 
 
 @app.post(

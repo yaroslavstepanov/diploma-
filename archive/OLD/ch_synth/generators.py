@@ -133,8 +133,11 @@ class PercentageGenerator(BaseGenerator):
 class EnumChoiceGenerator(BaseGenerator):
     values: List[Any]
     weights: Optional[List[float]] = None
+    mode: str = "random"
 
     def next(self, row_index: int) -> Any:
+        if (self.mode or "random").lower() == "sequential":
+            return self.values[row_index % len(self.values)]
         if self.weights:
             return random.choices(self.values, weights=self.weights, k=1)[0]
         return random.choice(self.values)
@@ -225,16 +228,18 @@ def build_generator(kind: str, params: Dict[str, Any]) -> BaseGenerator:
         values = params.get("values")
         if not isinstance(values, list) or not values:
             raise ValueError("enum_choice requires non-empty 'values' list")
-        weights = params.get("weights")
-        if weights:
-            if len(weights) != len(values):
-                raise ValueError("weights must have the same length as values")
-            weights_sum = sum(weights)
-            if weights_sum > 1.5:
-                weights = [w / 100.0 for w in weights]
-            normalized_weights = [w / sum(weights) for w in weights]
-            return EnumChoiceGenerator(values=list(values), weights=normalized_weights)
-        return EnumChoiceGenerator(values=list(values))
+        mode = (params.get("mode") or "random").strip().lower() or "random"
+        weights = None
+        if mode == "random":
+            weights = params.get("weights")
+            if weights:
+                if len(weights) != len(values):
+                    raise ValueError("weights must have the same length as values")
+                weights_sum = sum(weights)
+                if weights_sum > 1.5:
+                    weights = [w / 100.0 for w in weights]
+                weights = [w / sum(weights) for w in weights]
+        return EnumChoiceGenerator(values=list(values), weights=weights, mode=mode)
     if kind_lower == "random_digits":
         return RandomDigitsGenerator(length=int(params.get("length", 8)))
     if kind_lower == "uuid4":

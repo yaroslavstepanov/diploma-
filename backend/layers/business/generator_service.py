@@ -3,6 +3,7 @@ Business Logic Layer - сервис генерации данных
 """
 from typing import List, Dict, Any
 from ch_synth.generators import build_generator, BaseGenerator
+from backend.dictionaries import resolve_enum_params
 from ch_synth.profile import Profile
 import tempfile
 import json
@@ -27,6 +28,8 @@ class GeneratorService:
         # Убираем служебные поля
         clean_params = {k: v for k, v in params.items() 
                        if k not in ['field_name', 'field_type']}
+        if generator_kind == "enum_choice" and clean_params.get("dictionary"):
+            clean_params = resolve_enum_params(clean_params)
         return build_generator(generator_kind, clean_params)
     
     @staticmethod

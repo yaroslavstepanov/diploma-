@@ -1,0 +1,11 @@
+# Ограничить ресурсы ClickHouse — чтобы бенчмарк мог его положить
+# Запуск: docker compose -f docker-compose.yml -f docker-compose.stress.yml up -d
+# 1G — проверить, выдержит ли стресс.
+services:
+  clickhouse:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M

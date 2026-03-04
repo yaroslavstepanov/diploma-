@@ -60,9 +60,19 @@ class GenerateRequest(BaseModel):
     )
     rows: int = Field(
         10,
-        description="Количество строк для генерации",
+        description="Количество строк для генерации (или вычисляется из duration × rate_per_second)",
         ge=1,
         example=1000
+    )
+    duration: Optional[str] = Field(
+        None,
+        description="Длительность генерации (1s, 5m, 1h). Вместе с rate_per_second задаёт объём.",
+        example="60s"
+    )
+    rate_per_second: Optional[float] = Field(
+        None,
+        description="Сообщений в секунду. Вместе с duration задаёт rows = duration_seconds × rate_per_second.",
+        example=10.0
     )
     batch_size: int = Field(
         1000,
@@ -353,3 +363,18 @@ class DescribeTableResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Проверка работоспособности сервиса"""
     status: str = Field(..., description="Статус", example="ok")
+
+
+class DictionarySchema(BaseModel):
+    """Словарь"""
+    name: str = Field(..., description="Имя словаря", example="mac_pool_4")
+    values_count: int = Field(..., description="Количество значений", example=4)
+
+
+class DictionariesResponse(BaseModel):
+    """Список именованных словарей"""
+    dictionaries: List[DictionarySchema] = Field(
+        ...,
+        description="Словари из dictionaries/index.json",
+        example=[{"name": "mac_pool_4", "values_count": 4}]
+    )

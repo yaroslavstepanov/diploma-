@@ -4,6 +4,7 @@ let GENERATOR_PARAMS = {};
 let GENERATOR_LABELS = {};
 let ALL_GENERATORS = [];
 let SUPPORTED_TYPES = [];
+let DICTIONARIES = [];
 let REFERENCE_READY = false;
 
 // Fallback при недоступности API
@@ -22,7 +23,13 @@ const FALLBACK_GENERATOR_PARAMS = {
     'random_digits': { length: { type: 'number', label: 'Длина', default: 8, min: 1, max: 100 } },
     'uuid4': {},
     'url_template': { pattern: { type: 'text', label: 'Шаблон', placeholder: 'https://example.com/item/{row}?uuid={uuid}', default: 'https://example.com/item/{row}?uuid={uuid}' } },
-    'enum_choice': { values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' }, weights: { type: 'textarea', label: 'Вероятности % (опционально)', placeholder: '50\n30\n20' } },
+    'enum_choice': {
+        source: { type: 'select', label: 'Источник', default: 'inline', options: ['inline', 'dictionary'], optionLabels: { 'inline': 'Ввести вручную', 'dictionary': 'Из словаря' } },
+        dictionary: { type: 'dictionary_select', label: 'Словарь', default: '' },
+        mode: { type: 'select', label: 'Режим', default: 'random', options: ['random', 'sequential'], optionLabels: { 'random': 'Случайный', 'sequential': 'По очереди' } },
+        values: { type: 'textarea', label: 'Значения (по строке)', placeholder: 'value1\nvalue2' },
+        weights: { type: 'textarea', label: 'Вероятности % (опционально)', placeholder: '50\n30\n20' }
+    },
     'regex': {
         preset: { type: 'select', label: 'Формат', default: '', options: ['', 'ru_passport', 'ru_phone', 'mac_address'], optionLabels: { '': 'Свой regex', 'ru_passport': 'Паспорт РФ', 'ru_phone': 'Телефон РФ (+7)', 'mac_address': 'MAC-адрес' } },
         pattern: { type: 'text', label: 'Регулярное выражение', placeholder: '[A-Z]{3}-\\d{4}', default: '[a-z0-9]{8}' }
@@ -97,6 +104,7 @@ function buildFromApi(generators, types) {
             if (p.max != null) cfg.max = p.max;
             if (p.options) cfg.options = p.options;
             if (p.option_labels) cfg.optionLabels = p.option_labels;
+            if (p.name === 'dictionary' && g.kind === 'enum_choice') cfg.type = 'dictionary_select';
             if (p.name === 'probability') {
                 cfg.label = 'Вероятность последовательного значения (%)';
                 cfg.default = p.default != null ? p.default * 100 : 100;
@@ -115,9 +123,10 @@ function buildFromApi(generators, types) {
 async function loadReferenceData() {
     const ts = Date.now();
     try {
-        const [genRes, typesRes] = await Promise.all([
+        const [genRes, typesRes, dictRes] = await Promise.all([
             fetch(`/api/generators?_=${ts}`, { cache: 'no-store' }),
-            fetch(`/api/supported-types?_=${ts}`, { cache: 'no-store' })
+            fetch(`/api/supported-types?_=${ts}`, { cache: 'no-store' }),
+            fetch(`/api/dictionaries?_=${ts}`, { cache: 'no-store' }).catch(() => ({ ok: false }))
         ]);
         if (!genRes.ok || !typesRes.ok) throw new Error('API error');
         const genJson = await genRes.json();
@@ -125,6 +134,7 @@ async function loadReferenceData() {
         const generators = genJson.generators || [];
         const types = typesJson.types || [];
         if (!generators.length || !types.length) throw new Error('Empty data');
+        DICTIONARIES = dictRes.ok ? ((await dictRes.json()).dictionaries || []).map(d => ({ value: d.name, label: `${d.name} (${d.values_count})` })) : [];
         const { dtypeGen, genParams, genLabels, allGenerators } = buildFromApi(generators, types);
         DATA_TYPE_GENERATORS = dtypeGen;
         GENERATOR_PARAMS = genParams;
@@ -140,6 +150,7 @@ async function loadReferenceData() {
         GENERATOR_LABELS = FALLBACK_GENERATOR_LABELS;
         ALL_GENERATORS = FALLBACK_ALL_GENERATORS;
         SUPPORTED_TYPES = FALLBACK_SUPPORTED_TYPES;
+        DICTIONARIES = DICTIONARIES.length ? DICTIONARIES : [{ value: 'mac_pool_4', label: 'mac_pool_4 (4)' }, { value: 'servers', label: 'servers (3)' }, { value: 'regions', label: 'regions (4)' }];
         REFERENCE_READY = true;
         return false;
     }
@@ -174,6 +185,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnClearTable').addEventListener('click', clearTable);
     document.getElementById('btnDropTable').addEventListener('click', dropTable);
     document.getElementById('btnRefreshPreview').addEventListener('click', refreshPreview);
+
+    document.querySelectorAll('input[name="volumeMode"]').forEach(r => {
+        r.addEventListener('change', () => {
+            const mode = r.value;
+            document.getElementById('volumeRowsWrap').style.display = mode === 'rows' ? '' : 'none';
+            document.getElementById('volumeDurationWrap').style.display = mode === 'duration' ? '' : 'none';
+            if (mode === 'duration') updateDurationRowsHint();
+        });
+    });
+    ['durationValue', 'durationUnit', 'ratePerSecond'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateDurationRowsHint);
+        if (el) el.addEventListener('change', updateDurationRowsHint);
+    });
 
     document.getElementById('tableSelect').addEventListener('change', () => {
         const sel = document.getElementById('tableSelect');
@@ -334,6 +359,9 @@ function updateFieldParamsPanel() {
         paramGroup.className = 'param-group';
         if (f.generatorKind === 'random_int' && key === 'precision') paramGroup.dataset.showWhen = 'use_float';
         if (f.generatorKind === 'regex' && key === 'pattern') paramGroup.dataset.showWhen = 'preset_empty';
+        if (f.generatorKind === 'enum_choice' && key === 'weights') paramGroup.dataset.showWhen = 'enum_mode_random';
+        if (f.generatorKind === 'enum_choice' && key === 'dictionary') paramGroup.dataset.showWhen = 'enum_source_dict';
+        if (f.generatorKind === 'enum_choice' && key === 'values') paramGroup.dataset.showWhen = 'enum_source_inline';
         const label = document.createElement('label');
         label.textContent = config.label || key;
         let input;
@@ -350,6 +378,19 @@ function updateFieldParamsPanel() {
                 o.value = opt;
                 o.textContent = (labels[opt] != null ? labels[opt] : opt) || '(пусто)';
                 if (String(opt) === String(f.params[key] ?? config.default ?? '')) o.selected = true;
+                input.appendChild(o);
+            });
+        } else if (config.type === 'dictionary_select') {
+            input = document.createElement('select');
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '— Выберите —';
+            input.appendChild(opt0);
+            (DICTIONARIES || []).forEach(d => {
+                const o = document.createElement('option');
+                o.value = d.value || d.name;
+                o.textContent = d.label || d.name;
+                if (String(o.value) === String(f.params[key] ?? config.default ?? '')) o.selected = true;
                 input.appendChild(o);
             });
         } else if (config.type === 'checkbox') {
@@ -369,7 +410,7 @@ function updateFieldParamsPanel() {
             }
         }
         input.dataset.paramKey = key;
-        const eventType = (config.type === 'select' || config.type === 'checkbox') ? 'change' : 'input';
+        const eventType = (config.type === 'select' || config.type === 'checkbox' || config.type === 'dictionary_select') ? 'change' : 'input';
         input.addEventListener(eventType, () => {
             fieldsState[selectedFieldIndex].params[key] = getParamValue(input, config.type);
             if (f.generatorKind === 'random_int' && key === 'use_float') {
@@ -379,6 +420,16 @@ function updateFieldParamsPanel() {
             if (f.generatorKind === 'regex' && key === 'preset') {
                 const pat = content.querySelector('[data-show-when="preset_empty"]');
                 if (pat) pat.style.display = (input.value === '' || input.value === undefined) ? '' : 'none';
+            }
+            if (f.generatorKind === 'enum_choice' && key === 'mode') {
+                const w = content.querySelector('[data-show-when="enum_mode_random"]');
+                if (w) w.style.display = (input.value === 'random') ? '' : 'none';
+            }
+            if (f.generatorKind === 'enum_choice' && key === 'source') {
+                const dictDiv = content.querySelector('[data-show-when="enum_source_dict"]');
+                const valsDiv = content.querySelector('[data-show-when="enum_source_inline"]');
+                if (dictDiv) dictDiv.style.display = (input.value === 'dictionary') ? '' : 'none';
+                if (valsDiv) valsDiv.style.display = (input.value === 'inline') ? '' : 'none';
             }
         });
         paramGroup.appendChild(label);
@@ -392,6 +443,21 @@ function updateFieldParamsPanel() {
             const presetSel = content.querySelector(`[data-param-key="preset"]`);
             const presetVal = presetSel ? presetSel.value : (f.params.preset ?? '');
             paramGroup.style.display = (!presetVal || presetVal === '') ? '' : 'none';
+        }
+        if (paramGroup.dataset.showWhen === 'enum_mode_random') {
+            const modeSel = content.querySelector(`[data-param-key="mode"]`);
+            const modeVal = modeSel ? modeSel.value : (f.params.mode ?? 'random');
+            paramGroup.style.display = (modeVal === 'random') ? '' : 'none';
+        }
+        if (paramGroup.dataset.showWhen === 'enum_source_dict') {
+            const srcSel = content.querySelector(`[data-param-key="source"]`);
+            const srcVal = srcSel ? srcSel.value : (f.params.source ?? 'inline');
+            paramGroup.style.display = (srcVal === 'dictionary') ? '' : 'none';
+        }
+        if (paramGroup.dataset.showWhen === 'enum_source_inline') {
+            const srcSel = content.querySelector(`[data-param-key="source"]`);
+            const srcVal = srcSel ? srcSel.value : (f.params.source ?? 'inline');
+            paramGroup.style.display = (srcVal === 'inline') ? '' : 'none';
         }
     });
 }
@@ -419,7 +485,7 @@ function getParamValue(input, type) {
         return parseFloat(input.value) || 0;
     } else if (type === 'textarea') {
         return input.value.split('\n').filter(v => v.trim()).map(v => v.trim());
-    } else if (type === 'select') {
+    } else if (type === 'select' || type === 'dictionary_select') {
         return input.value;
     } else if (type === 'checkbox') {
         return input.checked;
@@ -551,6 +617,35 @@ function getPreviewLimit() {
     return parseInt(document.getElementById('previewLimit').value) || 100;
 }
 
+function getVolumeParams() {
+    const mode = document.querySelector('input[name="volumeMode"]:checked')?.value || 'rows';
+    if (mode === 'duration') {
+        const val = parseFloat(document.getElementById('durationValue').value) || 60;
+        const unit = document.getElementById('durationUnit').value;
+        const rate = parseFloat(document.getElementById('ratePerSecond').value) || 10;
+        const duration = `${val}${unit}`;
+        return { duration, rate_per_second: rate, rows: null };
+    }
+    const rows = parseInt(document.getElementById('rowsToGenerate').value) || 10;
+    return { rows, duration: null, rate_per_second: null };
+}
+
+function updateDurationRowsHint() {
+    const hint = document.getElementById('durationRowsHint');
+    if (!hint) return;
+    const val = parseFloat(document.getElementById('durationValue').value) || 60;
+    const unit = document.getElementById('durationUnit').value;
+    const rate = parseFloat(document.getElementById('ratePerSecond').value) || 10;
+    const mult = unit === 's' ? 1 : unit === 'm' ? 60 : 3600;
+    const rows = Math.round(val * mult * rate);
+    const etaSec = rate > 0 ? Math.ceil(rows / rate) : 0;
+    let txt = `≈ ${rows.toLocaleString()} строк`;
+    if (rate > 0 && rate < 10 && rows > 10) {
+        txt += ` (~${etaSec} сек)`;
+    }
+    hint.textContent = txt;
+}
+
 function renderPreviewTable(fetchResult) {
     let html = '<table><thead><tr>';
     fetchResult.columns.forEach(col => {
@@ -623,34 +718,48 @@ async function generatePreview() {
     const connection = getConnection();
     const targetTable = getTargetTable();
     const createTable = document.getElementById('createTable').checked;
-    const rowsToGenerate = parseInt(document.getElementById('rowsToGenerate').value) || 10;
+    const vol = getVolumeParams();
 
     if (!targetTable) {
         alert('Укажите название таблицы');
         return;
     }
-    if (rowsToGenerate < 1 || rowsToGenerate > 1000000) {
-        alert('Количество строк должно быть от 1 до 1,000,000');
+    const rowsToGenerate = vol.rows;
+    if (rowsToGenerate !== null && (rowsToGenerate < 1 || rowsToGenerate > 10000000)) {
+        alert('Количество строк должно быть от 1 до 10,000,000');
+        return;
+    }
+    if (vol.duration && (vol.rate_per_second < 0.01 || vol.rate_per_second > 10000)) {
+        alert('Скорость должна быть от 0.01 до 10,000 сообщ/сек');
         return;
     }
 
     previewTable.innerHTML = '<div class="preview-placeholder">Генерация данных в БД...</div>';
 
+    const body = {
+        generator_kind: null,
+        generator_params: null,
+        fields: fieldsData,
+        connection,
+        target_table: targetTable,
+        create_table: createTable,
+        preview_only: false
+    };
+    if (vol.rows !== null) {
+        body.rows = vol.rows;
+        body.batch_size = Math.min(1000, vol.rows);
+    } else {
+        body.duration = vol.duration;
+        body.rate_per_second = vol.rate_per_second;
+        body.rows = 1;
+        body.batch_size = 1000;
+    }
+
     try {
         const generateResponse = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                generator_kind: null,
-                generator_params: null,
-                fields: fieldsData,
-                connection,
-                target_table: targetTable,
-                rows: rowsToGenerate,
-                batch_size: Math.min(1000, rowsToGenerate),
-                create_table: createTable,
-                preview_only: false
-            })
+            body: JSON.stringify(body)
         });
 
         const generateResult = await generateResponse.json();
@@ -768,9 +877,17 @@ function convertParamsForBackend(generatorKind, params) {
             return result;
         }
         case 'enum_choice': {
-            const result = { values: params.values || [] };
-            if (params.weights && params.weights.length > 0) {
-                result.weights = params.weights.map(w => Math.round((parseFloat(w) || 0) * 100) / 100);
+            const source = params.source || 'inline';
+            const result = { mode: params.mode || 'random' };
+            if (source === 'dictionary' && params.dictionary) {
+                result.source = 'dictionary';
+                result.dictionary = params.dictionary.trim();
+            } else {
+                result.source = 'inline';
+                result.values = params.values || [];
+                if (result.mode === 'random' && params.weights && params.weights.length > 0) {
+                    result.weights = params.weights.map(w => Math.round((parseFloat(w) || 0) * 100) / 100);
+                }
             }
             return result;
         }

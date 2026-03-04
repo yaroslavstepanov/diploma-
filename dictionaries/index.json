@@ -1,0 +1,19 @@
+{
+  "mac_pool_4": [
+    "AA:BB:CC:DD:EE:01",
+    "AA:BB:CC:DD:EE:02",
+    "AA:BB:CC:DD:EE:03",
+    "AA:BB:CC:DD:EE:04"
+  ],
+  "servers": [
+    "srv1.example.com",
+    "srv2.example.com",
+    "srv3.example.com"
+  ],
+  "regions": [
+    "Moscow",
+    "SPb",
+    "Novosibirsk",
+    "Ekaterinburg"
+  ]
+}
