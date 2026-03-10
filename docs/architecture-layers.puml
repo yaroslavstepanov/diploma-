@@ -1,0 +1,43 @@
+@startuml Field Generator - Компоненты Backend (C4 Level 3)
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Компонентная диаграмма Backend (трёхслойная архитектура)
+
+Container_Boundary(api, "Backend API") {
+    Container_Boundary(presentation, "Presentation Layer") {
+        Component(routes, "Routes", "FastAPI", "HTTP endpoints, валидация")
+        Component(models, "Models", "Pydantic", "Request/Response схемы")
+    }
+    
+    Container_Boundary(business, "Business Logic Layer") {
+        Component(gen_svc, "GeneratorService", "Python", "Создание генераторов,\nпрофилей, оркестрация")
+    }
+    
+    Container_Boundary(data, "Data Access Layer") {
+        Component(ch_repo, "ClickHouseRepository", "Python", "DDL, INSERT")
+        Component(pg_repo, "PostgresRepository", "Python", "DDL, INSERT")
+    }
+}
+
+Container_Boundary(ch_synth, "ch_synth") {
+    Component(generators, "Generators", "Python", "random_int, uuid4, regex, enum_choice...")
+    Component(profile, "Profile", "Python", "Конфигурация полей")
+    Component(client, "ClickHouseClient", "Python", "Низкоуровневый клиент")
+}
+
+ContainerDb(clickhouse, "ClickHouse", "", "")
+ContainerDb(postgres, "PostgreSQL", "", "")
+
+Rel(routes, models, "использует")
+Rel(routes, gen_svc, "вызывает")
+Rel(gen_svc, ch_repo, "использует")
+Rel(gen_svc, pg_repo, "использует")
+Rel(gen_svc, generators, "создаёт")
+Rel(gen_svc, profile, "создаёт")
+Rel(ch_repo, client, "использует")
+Rel(ch_repo, clickhouse, "подключение")
+Rel(pg_repo, postgres, "подключение")
+
+@enduml

@@ -1,0 +1,38 @@
+@startuml Field Generator - Развёртывание
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Диаграмма развёртывания
+
+node "Хост (Windows / Mac / Linux)" as host {
+    
+    node "Браузер" as browser {
+        component [Web UI\nHTML/CSS/JS] as ui
+    }
+    
+    node "Python 3.10+" as python {
+        component [Uvicorn\nASGI Server] as uvicorn
+        component [FastAPI\nBackend] as fastapi
+        component "ch_synth\n(generators)" as ch_synth
+    }
+    
+    node "Docker" as docker {
+        node "Контейнер clickhouse" as ch_container {
+            database "ClickHouse\nServer" as clickhouse
+        }
+    }
+    
+    node "Docker (опционально)" as docker_pg {
+        node "Контейнер postgres" as pg_container {
+            database "PostgreSQL" as postgres
+        }
+    }
+}
+
+browser -down-> uvicorn : HTTPS :5000
+uvicorn -down-> fastapi : ASGI
+fastapi -down-> ch_synth : import
+fastapi -down-> clickhouse : HTTP :18123
+fastapi -down-> postgres : TCP :5433
+
+@enduml

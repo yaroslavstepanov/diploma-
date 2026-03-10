@@ -1,0 +1,43 @@
+@startuml Field Generator - Компоненты Backend (автономная версия)
+!theme plain
+skinparam backgroundColor #FEFEFE
+
+title Компонентная диаграмма Backend\n(трёхслойная архитектура)
+
+package "Backend API" as api {
+
+    package "Presentation Layer" as presentation {
+        [Routes\nFastAPI] as routes
+        [Models\nPydantic] as models
+    }
+    
+    package "Business Logic Layer" as business {
+        [GeneratorService\nPython] as gen_svc
+    }
+    
+    package "Data Access Layer" as data {
+        [ClickHouseRepository] as ch_repo
+        [PostgresRepository] as pg_repo
+    }
+}
+
+package "ch_synth" as ch_synth {
+    [Generators\nrandom_int, uuid4, regex...] as generators
+    [Profile\nКонфигурация полей] as profile
+    [ClickHouseClient] as client
+}
+
+database "ClickHouse" as clickhouse
+database "PostgreSQL" as postgres
+
+routes --> models : использует
+routes --> gen_svc : вызывает
+gen_svc --> ch_repo : использует
+gen_svc --> pg_repo : использует
+gen_svc --> generators : создаёт
+gen_svc --> profile : создаёт
+ch_repo --> client : использует
+ch_repo --> clickhouse : подключение
+pg_repo --> postgres : подключение
+
+@enduml

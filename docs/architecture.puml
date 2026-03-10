@@ -1,0 +1,19 @@
+@startuml Field Generator - Контекст системы (C4 Level 1)
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Контекст системы Field Generator
+
+Person(dev, "Разработчик\nТестировщик", "Настраивает схему,\nзапускает генерацию")
+
+System(field_gen, "Field Generator", "Генерация синтетических данных\nи загрузка в СУБД")
+
+System_Ext(clickhouse, "ClickHouse", "Колоночная СУБД")
+System_Ext(postgres, "PostgreSQL", "Реляционная СУБД\n(опционально)")
+
+Rel(dev, field_gen, "Использует", "HTTPS, REST API")
+Rel(field_gen, clickhouse, "Загружает данные", "HTTP, Native")
+Rel(field_gen, postgres, "Загружает данные", "TCP, SQL")
+
+@enduml
